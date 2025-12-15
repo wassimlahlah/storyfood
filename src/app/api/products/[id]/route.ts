@@ -3,57 +3,38 @@ import { prisma } from "@/utils/connect";
 import { NextRequest, NextResponse } from "next/server";
 
 // GET SINGLE PRODUCT
-export const GET = async (
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) => {
-  const { id } = params;
-
+export async function GET(req: NextRequest) {
   try {
-    const product = await prisma.product.findUnique({
-      where: {
-        id: id,
-      },
-    });
+    const url = new URL(req.url);
+    const id = url.pathname.split("/").pop(); // أخذ الجزء الأخير من path
+    if (!id) return NextResponse.json({ message: "ID not provided" }, { status: 400 });
 
-    return new NextResponse(JSON.stringify(product), { status: 200 });
+    const product = await prisma.product.findUnique({ where: { id } });
+
+    return NextResponse.json(product);
   } catch (err) {
-    console.log(err);
-    return new NextResponse(
-      JSON.stringify({ message: "Something went wrong!" }),
-      { status: 500 }
-    );
+    console.error(err);
+    return NextResponse.json({ message: "Something went wrong!" }, { status: 500 });
   }
-};
+}
 
 // DELETE SINGLE PRODUCT
-export const DELETE = async (
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) => {
-  const { id } = params;
-  const session = await getAuthSession();
+export async function DELETE(req: NextRequest) {
+  try {
+    const url = new URL(req.url);
+    const id = url.pathname.split("/").pop();
+    if (!id) return NextResponse.json({ message: "ID not provided" }, { status: 400 });
 
-  if (session?.user.isAdmin) {
-    try {
-      await prisma.product.delete({
-        where: {
-          id: id,
-        },
-      });
+    const session = await getAuthSession();
 
-      return new NextResponse(JSON.stringify("Product has been deleted!"), {
-        status: 200,
-      });
-    } catch (err) {
-      console.log(err);
-      return new NextResponse(
-        JSON.stringify({ message: "Something went wrong!" }),
-        { status: 500 }
-      );
+    if (!session?.user.isAdmin) {
+      return NextResponse.json({ message: "You are not allowed!" }, { status: 403 });
     }
+
+    await prisma.product.delete({ where: { id } });
+    return NextResponse.json({ message: "Product has been deleted!" });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ message: "Something went wrong!" }, { status: 500 });
   }
-  return new NextResponse(JSON.stringify({ message: "You are not allowed!" }), {
-    status: 403,
-  });
-};
+}
